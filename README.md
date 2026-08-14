@@ -37,28 +37,21 @@ up can install it via [Miniconda](https://docs.conda.io/en/latest/miniconda.html
 
 **If you've cloned the repo:**
 ```bash
-git clone <lab-github-url>
+git clone https://github.com/BCM-Neurosurgery/artifactdetect.git
 cd artifactdetect
 pip install -e .
 ```
 `-e` installs in editable mode -- edits to the source take effect
-immediately.
+immediately. This is the right choice if you might
+want to read or modify the code.
 
 **If you just want to use it, without cloning:**
 ```bash
-pip install git+<BCM-Neurosurgery>.git
+pip install git+https://github.com/BCM-Neurosurgery/artifactdetect.git
 ```
 This installs directly from GitHub in one step, for anyone who just
-wants to run the tool, not edit it. 
+wants to run the tool, not edit it.
 
-**This repo is private to lab members-only** -- this method requires GitHub
-authentication set up first (an SSH key or a personal access token), or
-it will fail with a permission error. Same requirement applies to the
-clone-first method above; a private repo can't be cloned or pip-installed
-anonymously either way.
-
-Either way, this adds an `artifact-finder` command to your PATH inside
-the active conda environment.
 
 ## Usage
 
