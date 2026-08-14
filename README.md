@@ -4,14 +4,11 @@ Retrospective artifact-detection pipeline for local field potential (LFP)
 recordings. Works with data from any device that can be loaded into the
 expected timestamp + channel-columns CSV format -- see
 `prepare_lfp_csv`/`load_lfp_data` for converting raw device data into
-that shape. Includes optional support for Medtronic Summit RC+S session
-settings files specifically, but the detection pipeline itself does not
-require or assume RC+S data. Flags time windows with unusual broadband
+that shape. Flags time windows with unusual broadband
 power, using two complementary statistical methods, and produces a
 diagnostic figure plus a structured CSV for every flag.
 
-**Not source-attributed (a flag means "statistically unusual," not "this
-is movement")** -- not intended for clinical use.
+**Not source-attributed -- does not distinguish between movement artifact, stimulation artifacts, etc.
 
 ## Security & privacy notes
 
@@ -19,21 +16,11 @@ is movement")** -- not intended for clinical use.
   file path directly to the console (`loaded <path>: ...`), and that
   path can end up in terminal scrollback, screenshots, or copy-pasted
   error reports.
-- **Dependencies are currently unpinned.** Beyond the
-  reproducibility issue already noted, this also means there's no fixed
-  record of exactly which numpy/pandas/scipy/matplotlib version was
-  running for a given result -- worth knowing if a dependency
-  vulnerability is ever disclosed and you need to check whether a past
-  run was affected.
 - **`--out` / `out_dir` is not sanitized.** Low-risk in normal use (an
   interactive, single-user CLI writing to your own filesystem), but this
   tool was not built to safely accept an output path from another,
   untrusted program.
-- **Installing via `pip install git+<url>` runs code at install time.**
-  This is true of any pip-installable Python package, not something
-  specific to this tool -- but it means anyone with push access to this
-  repo can run code on every lab member's machine the next time they
-  install or reinstall.
+
 
 ## Install
 
@@ -47,7 +34,7 @@ conda activate artifactdetect
 This keeps this package's dependencies (numpy, pandas, scipy, matplotlib)
 separate from anything else installed on your system or in other conda
 environments -- installing this won't touch or conflict with a different
-project's package versions. Anyone in the lab without conda already set
+project's package versions. Anyone without conda already set
 up can install it via [Miniconda](https://docs.conda.io/en/latest/miniconda.html).
 
 ### 2. Install the package
@@ -59,19 +46,16 @@ cd artifactdetect
 pip install -e .
 ```
 `-e` installs in editable mode -- edits to the source take effect
-immediately, no reinstall needed. This is the right choice if you might
-want to read or modify the code.
+immediately.
 
 **If you just want to use it, without cloning:**
 ```bash
-pip install git+<lab-github-url>.git
+pip install git+<BCM-Neurosurgery>.git
 ```
-This installs directly from GitHub in one step -- no manual clone, no
-local copy of the source to manage. Right choice for anyone who just
-wants to run the tool, not edit it. (Replace `<lab-github-url>` with the
-actual repo URL once it's created on the lab GitHub.)
+This installs directly from GitHub in one step, for anyone who just
+wants to run the tool, not edit it. 
 
-**This repo is private, lab-members-only** -- this method requires GitHub
+**This repo is private to lab members-only** -- this method requires GitHub
 authentication set up first (an SSH key or a personal access token), or
 it will fail with a permission error. Same requirement applies to the
 clone-first method above; a private repo can't be cloned or pip-installed
@@ -142,12 +126,10 @@ artifactdetect/
 ├── pyproject.toml              <- package metadata + dependencies
 ├── README.md
 ├── .gitignore
-├── docs/
-│   └── pipeline_walkthrough.pptx
-└── artifactdetect/                <- the actual importable package
+└── artifactdetect/                <- actual importable package
     ├── __init__.py               <- exposes the public API
     ├── artifact_finder.py        <- detection logic, plotting, CLI
-    └── prepare_lfp_csv.py        <- device-agnostic data-loading helper
+    └── prepare_lfp_csv.py        <- data-loading helper, does not require LFP data from a specific device
 ```
 
 ## How detection works, briefly
@@ -155,14 +137,14 @@ artifactdetect/
 1. Broadband power (>40 Hz) is computed per channel in a sliding 1.0s
    window (0.5s hop).
 2. That series is scored two ways: a LOCAL rolling MAD z-score (5.0s
-   centered window -- sensitive to brief transients, blind to long
+   centered window -- sensitive to brief transient events, not to long
    sustained events) and a GLOBAL whole-session MAD z-score (sensitive to
    sustained events, but only if they're a minority of the session). A
    channel is flagged if either crosses z > 6.5.
 3. Flagged channels are overlaid in time to find cross-channel agreement,
    producing three confidence tiers: `single-channel`, `high`, and
    `priority-agreement` (based on whether channels 3 & 4 specifically
-   agree, and how).
+   agree, and how). Channels 3 & 4 are currently designated as "priority channels" and determine "priority-agreement flagged windows", which are considered highest-confidence artifacts. If more than one channel agree outside of this (e.g. Ch1 and Ch2), this is a "high-confidence" flagged window. Finally, if only one channel identifies a threshold crossing, it is labeled as a "single-channel" flagged window. All three flagged window types are separated into distinct output folders.
 4. Every distinct threshold-crossing event is identified (a signal
    dropping back under threshold and re-crossing counts as a new event,
    not a continuation).
