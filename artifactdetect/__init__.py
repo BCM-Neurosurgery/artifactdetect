@@ -2,9 +2,7 @@
 artifactdetect -- artifact detection pipeline for LFP (local field
 potential) recordings. Works with data from any device that can be
 loaded into the expected timestamp + channel-columns CSV format (see
-prepare_lfp_csv for converting raw device data into that shape). Includes
-optional support for Medtronic Summit RC+S session settings files
-specifically, but detection itself does not require or assume RC+S data.
+prepare_lfp_csv for converting raw device data into that shape).
 
 Exposes the main entry points at the top level, so:
     from artifactdetect import detect_artifacts, run_from_data
