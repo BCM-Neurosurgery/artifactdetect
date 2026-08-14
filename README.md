@@ -15,11 +15,7 @@ diagnostic figure plus a structured CSV for every flag.
 - **Don't use patient-identifiable filenames.** The tool prints the input
   file path directly to the console (`loaded <path>: ...`), and that
   path can end up in terminal scrollback, screenshots, or copy-pasted
-  error reports.
-- **`--out` / `out_dir` is not sanitized.** Low-risk in normal use (an
-  interactive, single-user CLI writing to your own filesystem), but this
-  tool was not built to safely accept an output path from another,
-  untrusted program.
+  error reports. Refrain from using PII in any filenames.
 
 
 ## Install
