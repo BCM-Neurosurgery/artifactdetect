@@ -132,7 +132,7 @@ artifactdetect/
     └── prepare_lfp_csv.py        <- data-loading helper, does not require LFP data from a specific device
 ```
 
-## How detection works, briefly
+## How detection works:
 
 1. Broadband power (>40 Hz) is computed per channel in a sliding 1.0s
    window (0.5s hop).
