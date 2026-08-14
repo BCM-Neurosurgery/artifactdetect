@@ -21,8 +21,7 @@ artifact_output/
 w[0-9][0-9][0-9][0-9]_*.png
 artifact_times.csv
 
-# Secrets -- API keys, credentials, tokens. GitHub is for code, not
-# secrets, even in a private repo. Never commit these.
+# API keys, credentials, tokens -- don't commit
 .env
 .env.*
 !.env.example
@@ -30,7 +29,7 @@ artifact_times.csv
 *.key
 secrets.*
 
-# Raw patient data -- never commit this. Keep session CSVs, settings
+# Raw patient data, don't commit. Keep session CSVs, settings
 # JSON, and accel files local/untracked; share via secure lab storage,
 # not git.
 *.csv
