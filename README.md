@@ -75,6 +75,12 @@ device's export, or you have raw arrays + a sample rate), see
 
 ### From another script or notebook
 
+`run_from_data()` is the main function -- it does the whole pipeline
+(detection, CSV, per-window figures, confidence subfolders) from
+already-loaded data. Use once you've confirmed the
+CLI works on your data and want to call the pipeline directly from your
+own analysis code instead.
+
 ```python
 from artifactdetect import load_lfp_csv, run_from_data
 
@@ -83,30 +89,52 @@ lfp, t_s, fs, labels, gaps = load_lfp_csv("session.csv", settings_path="Settings
 windows = run_from_data(lfp, t_s, fs, labels, gaps_s=gaps, out_dir="my_output")
 ```
 
-`run_from_data()` does the whole pipeline -- detection, CSV, per-window
-figures, confidence subfolders -- from already-loaded data. Once
-installed, everything is importable directly from `artifactdetect`
-without needing to know the internal file layout
-(`detect_artifacts`, `Z_THRESH`, etc. are all available at the top level
--- see `artifactdetect/__init__.py` for the full list).
+**Required inputs:**
+
+| parameter | type | what it is |
+|---|---|---|
+| `lfp` | ndarray, shape `(n_channels, n_samples)` | the LFP signal itself |
+| `t_s` | ndarray, shape `(n_samples,)` | timestamp of each sample, in seconds from the first sample -- not raw sample indices, actual elapsed time |
+| `fs_nominal` | float | sample rate in Hz |
+| `channel_labels` | list of str, length `n_channels` | a name per channel, e.g. `["+2-0", "+3-1", "+9-8", "+11-10"]` |
+
+**Optional inputs:**
+
+| parameter | type | default | what it is |
+|---|---|---|---|
+| `gaps_s` | list of `(start_s, end_s, gap_ms)` tuples | `None` | known data dropouts, so windows overlapping a gap aren't flagged; `load_lfp_csv` produces this for you automatically |
+| `out_dir` | str | `"artifact_output"` | where the CSV, figures, and confidence output folders get written |
+
+All four required inputs are exactly what `load_lfp_csv()` (or
+`load_lfp_data()`, if you're loading raw device data rather than a CSV --
+see below) returns, in the same order
+
+**Return value:** a list of dicts, one per flagged window, sorted by
+start time. Each dict has these keys:
+
+| key | type | meaning |
+|---|---|---|
+| `flag_start`, `flag_end` | float | window bounds, in seconds |
+| `first_crossing_time_s` | float | time of the first threshold crossing in this window |
+| `crossing_times_s` | list of float | every distinct crossing time (a signal dropping back under threshold and re-crossing counts as a new one) |
+| `n_mad_crossings` | int | `len(crossing_times_s)` |
+| `max_mad_z_broadband` | float | the strongest z-score reached by any contributing channel |
+| `trigger_channel` | str | which channel had the strongest evidence |
+| `channels_crossing` | list of str | every channel that crossed threshold in this window |
+| `detection_methods` | list of str | `"local"`, `"global"`, or `"both"`, aligned index-for-index with `channels_crossing` |
+| `peak_local_z`, `peak_global_z` | list of float | each contributing channel's peak z-score under that method, same alignment |
+| `confidence` | str | `"single-channel"`, `"high"`, or `"priority-agreement"` |
+
+This is the same data written to `artifact_times.csv` -- if you're doing
+your own downstream analysis, you can work directly with this returned
+list instead of re-reading the CSV back in.
+
+Once installed, everything is importable directly from `artifactdetect`
+without needing to know the internal file layout (`detect_artifacts`,
+`Z_THRESH`, etc. are all available at the top level -- see
+`artifactdetect/__init__.py` for the full list).
 
 ### Loading raw data from any device
-
-`prepare_lfp_csv` / `load_lfp_data` convert raw LFP data (a dict of
-channel arrays, a bare numpy array, or a DataFrame) into the CSV format
-above, or directly into the in-memory pipeline format, without needing
-real wall-clock timestamps (most devices don't provide them -- only a
-sample rate is required):
-
-```python
-from artifactdetect import prepare_lfp_csv, load_lfp_data
-
-# write a CSV file
-prepare_lfp_csv({"ch1": arr1, "ch2": arr2}, "session.csv", fs=500.0)
-
-# or skip the file entirely, go straight to in-memory pipeline format
-lfp, t_s, fs, labels, gaps = load_lfp_data({"ch1": arr1, "ch2": arr2}, fs=500.0)
-```
 
 ## Package structure
 
