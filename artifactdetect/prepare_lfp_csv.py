@@ -5,15 +5,14 @@ Helper for Step 1 of the pipeline (load LFP data). artifact_finder.py's
 load_lfp_csv() expects a CSV with a `timestamp` column (integer
 milliseconds) plus one column per channel -- anything else needs to get
 converted into that shape first. This module is that conversion step,
-built to work from whatever a device actually gives you -- it does not
-assume any particular device or manufacturer.
+built to work from whatever a device actually gives you, not
+assuming any particular device or manufacturer.
 
-Most devices don't hand you real wall-clock timestamps -- they give you
-raw channel arrays and a sample rate. This function accepts either:
-  - real timestamps, if you have them, or
+Function accepts either:
+  - real timestamps, or
   - just a sample rate, and it generates a consistent timestamp column
     from sample count (starting at 0 ms by default -- the actual pipeline
-    only needs correctly-SPACED timestamps, not true wall-clock time).
+    only needs correctly-spaced timestamps, not true wall-clock time).
 
 Accepts three common shapes of input data:
   1. dict of {channel_name: 1D array}          -- most device APIs
@@ -125,14 +124,10 @@ def load_lfp_data(data, fs=None, channel_names=None, start_time_ms=0,
     """
     Same inputs as prepare_lfp_csv, but skips the disk round-trip: returns
     the data directly in the exact tuple format artifact_finder.py's
-    load_lfp_csv() produces -- (lfp, t_s, fs, channel_labels, gaps) --
-    ready to hand straight to detect_artifacts() in a notebook or script
-    without ever writing a persistent file.
+    load_lfp_csv() produces -- (lfp, t_s, fs, channel_labels, gaps).
 
     Internally, this still goes through a TEMPORARY csv and calls the
-    real load_lfp_csv() on it, rather than reimplementing that parsing
-    logic a second time -- so gap detection, sample-rate estimation, and
-    channel labeling all stay identical to what the CLI actually does.
+    real load_lfp_csv() on it.
     Use this when you want the data in memory; use prepare_lfp_csv()
     directly when you want a CSV file you can keep, share, or feed to
     the CLI.
