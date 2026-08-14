@@ -3,27 +3,22 @@ artifact_finder.py
 
 General-purpose artifact finder for LFP recordings, from any device that
 can be loaded into the expected CSV format (see prepare_lfp_csv.py for
-converting raw device data). Not stim-aware and not source-attributed by
-design -- it flags "artifact" as a single category (broadband LFP
+converting raw device data). Not source-attributed by
+design --  flags "artifact" as a single category (broadband LFP
 elevation), and leaves distinguishing stim vs. movement vs. anything else
-to downstream review.
+to later review.
 
-Built to run on ANY patient/session, not just aDBS012:
+Built to run on any patient/session:
   - Channel names and LFP sample rate are read from that session's
     *Settings.json when available, or auto-detected from the CSV header
     otherwise -- nothing about a specific patient's contact configuration
     is hardcoded.
   - Windowing uses each sample's actual timestamp, not an assumed-constant
-    sample spacing -- so gaps (packet loss) don't silently misalign later
-    windows the way index-based slicing would.
+    sample spacing
   - All LFP channels are checked; whichever channel shows the strongest
-    broadband elevation in a given window is the one reported, rather than
-    assuming one fixed "primary" channel matters for every patient.
-  - No stim frequency notch, and no attempt to separate stim artifact from
-    movement artifact -- this is a general contamination detector, not a
-    source classifier. If stim is on, stim power will contribute to the
-    broadband feature like any other artifact; that's a known, accepted
-    limitation of this simplified version, not an oversight.
+    broadband elevation in a given window is the one reported
+  - All values are easily modifiable: window size, z-score threshold multiplier, priority channels, etc. (nothing hardcoded)
+  
 
 Usage
 -----
@@ -50,7 +45,7 @@ MERGE_GAP_S = 0.25
 ROLL_S = 5.0
 GAP_THRESH_FACTOR = 3.0
 
-PRIORITY_CHANNELS = [2, 3]
+PRIORITY_CHANNELS = [3, 4]
 PRIORITY_TOL = 0.10
 
 
@@ -122,12 +117,9 @@ def mad_z(x):
 
 def rolling_mad_z(x, step_s, roll_s=ROLL_S):
     """
-    Local rolling MAD z-score: median/MAD computed from a window CENTERED on
+    Local rolling MAD z-score: MAD computed from a window centered on
     each point, not from the whole session. This is what's actually used for
-    detection -- matches the established 5-second-centered-window convention
-    so the threshold adapts to local baseline conditions (e.g. a session
-    that's noisier in one stretch doesn't get a permanently loosened
-    threshold everywhere else, the way a single whole-session MAD would).
+    detection.
     """
     import pandas as pd
     n = max(3, int(round(roll_s / step_s)))
@@ -142,18 +134,14 @@ def rolling_mad_z(x, step_s, roll_s=ROLL_S):
 def rolling_mad_band(x, fs, roll_s, z_thresh):
     """
     Rolling median +/- z_thresh*MAD, computed directly on a (typically
-    bandpass-filtered) voltage trace -- NOT on the broadband-power feature
+    bandpass-filtered) voltage trace -- not on the broadband-power feature
     series used elsewhere in this file. Returns (median, upper, lower),
     all in the same units as x (e.g. uV), so the resulting band can be
     plotted directly on top of the raw signal to show how the local
     threshold moves over time.
 
     Uses two fast vectorized rolling-median passes (median, then median of
-    the absolute deviations from that median) rather than a single rolling
-    window with a custom per-window MAD callback -- the naive version is
-    correct but ~50x slower for no accuracy gain (verified: rolling
-    median matches exactly, MAD correlates at r=0.998 against the naive
-    per-window computation, on real aDBS012 data).
+    the absolute deviations from that median).
     """
     n = max(3, int(round(roll_s * fs)))
     s = pd.Series(x)
@@ -169,10 +157,7 @@ def compute_global_voltage_baseline(lfp, fs_lfp, bp_sos):
     """
     Whole-SESSION median +/- MAD, in voltage units, on the bandpass-
     filtered signal -- one scalar median and one scalar MAD per channel,
-    computed ONCE across the entire recording (not per-window, which
-    would repeat identical work 40+ times for no reason). This is the
-    GLOBAL counterpart to rolling_mad_band()'s LOCAL rolling version, in
-    the same units, so both can be drawn on the same voltage axis.
+    computed ONCE across the entire recording
 
     Returns (global_median, global_mad), each shape (n_channels,).
     """
@@ -228,15 +213,14 @@ def _merge_runs(flag_bool, starts):
 
 def detect_artifacts(lfp, t_s, channel_labels, fs_nominal, gaps_s=None):
     """
-    Each channel is thresholded INDEPENDENTLY (its own MAD z-score against
+    Each channel is thresholded independently (its own MAD z-score against
     its own baseline), not just compared via a single max-across-channels
     series. Per-channel flagged runs are then overlaid in time:
       - time covered by 2+ channels' runs simultaneously -> one window,
         confidence = "high"
       - time covered by only 1 channel's run -> a separate window,
         confidence = "single-channel"
-    This is what makes multi-channel agreement visible and reportable,
-    rather than collapsing to a single winning channel per window.
+    
     """
     starts = _time_windows(t_s, WIN_S, STEP_S)
     n_ch = lfp.shape[0]
@@ -410,7 +394,7 @@ def plot_window_with_threshold(seg_lfp, fs_lfp, flag_start, flag_end,
     detection-method strip panel, (5) the spectrogram.
 
     session_duration_s, if given, lets the header report where this
-    window falls within the whole recording, not just its own span.
+    window falls within the whole recording
     """
     import matplotlib.pyplot as plt
     from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
@@ -430,12 +414,7 @@ def plot_window_with_threshold(seg_lfp, fs_lfp, flag_start, flag_end,
     method_colors = {"both": "black", "global": "purple", "local": "gold"}
 
     def _set_time_ticks(ax, n=7):
-        """Evenly-spaced ticks from the true start to the true end of the
-        plotted time range, so the last tick always lands exactly at the
-        data boundary -- never overshooting past it, never leaving an
-        awkward unlabeled gap before it (which matplotlib's automatic
-        tick placement doesn't guarantee, especially with absolute
-        timestamps that rarely land on round numbers)."""
+        
         ticks = np.linspace(t_lfp[0], t_lfp[-1], n)
         ax.set_xticks(ticks)
         ax.set_xticklabels([f"{t:.1f}" for t in ticks])
@@ -600,12 +579,10 @@ def plot_window_with_threshold(seg_lfp, fs_lfp, flag_start, flag_end,
 def run_from_data(lfp, t_s, fs_nominal, channel_labels, gaps_s=None,
                   out_dir="artifact_output"):
     """
-    Does the WHOLE pipeline -- detection, CSV, per-window figures, and the
-    two confidence subfolders -- starting from ALREADY-LOADED data, not
-    file paths. This is the function to call from another script or a
+    Does the whole pipeline -- detection, CSV, per-window figures, and the
+    two confidence subfolders -- starting from already-loaded data. This is the function to call from another script or a
     notebook if you've loaded data yourself (e.g. via load_lfp_data() in
-    prepare_lfp_csv.py) and don't want to round-trip through a CSV file
-    on disk just to run this pipeline.
+    prepare_lfp_csv.py).
 
     Parameters
     ----------
@@ -703,10 +680,9 @@ def run_from_data(lfp, t_s, fs_nominal, channel_labels, gaps_s=None,
 def run(lfp_csv, settings_path=None, out_dir="artifact_output"):
     """
     Thin file-loading wrapper: reads the LFP/settings FILES from disk,
-    then hands everything to run_from_data() to do the actual work.
+    then moves to run_from_data().
     This is what the CLI (__main__ below) calls. If you already have data
-    loaded in memory, call run_from_data() directly instead -- no need to
-    write a CSV first.
+    loaded in memory, call run_from_data() directly instead
     """
     lfp, t_s, fs_nominal, channel_labels, gaps_s = load_lfp_csv(
         lfp_csv, settings_path=settings_path)
