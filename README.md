@@ -55,6 +55,11 @@ wants to run the tool, not edit it.
 
 ## Usage
 
+> **If building this into an automated or deployed pipeline** Use
+> `detect_artifacts()`, not `run_from_data()` -- same detection, but no
+> CSV or figures written on every run. See "For automated or deployed
+> workflows" in __init__.py
+
 ### Command line
 
 ```bash
