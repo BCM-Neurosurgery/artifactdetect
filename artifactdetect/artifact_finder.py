@@ -48,6 +48,10 @@ Z_THRESH = 6.5
 MIN_FLAG_S = 0.5
 MERGE_GAP_S = 0.25
 ROLL_S = 5.0
+MIN_DURATION_S = 5.0  # flat floor -- refuse to run on essentially empty
+                      # or corrupt files, not tied to ROLL_S (which is
+                      # itself just a tunable constant, not a hard
+                      # structural requirement)
 GAP_THRESH_FACTOR = 1.9
 
 PRIORITY_CHANNELS = [2, 3]
@@ -238,6 +242,14 @@ def detect_artifacts(lfp, t_s, channel_labels, fs_nominal, gaps_s=None):
     This is what makes multi-channel agreement visible and reportable,
     rather than collapsing to a single winning channel per window.
     """
+    duration_s = t_s[-1] - t_s[0]
+    if duration_s < MIN_DURATION_S:
+        raise ValueError(
+            f"Recording is only {duration_s:.1f}s long -- too short to "
+            f"run detection on (minimum {MIN_DURATION_S:.0f}s). Refusing "
+            f"to run rather than produce near-meaningless output on data "
+            f"this small.")
+
     starts = _time_windows(t_s, WIN_S, STEP_S)
     n_ch = lfp.shape[0]
 
